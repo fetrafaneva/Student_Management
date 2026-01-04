@@ -13,50 +13,54 @@ import javax.servlet.http.HttpServletResponse;
 public class DeleteEtudiantServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
+    // Configuration de la base de données
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/projet_jsp?useSSL=false&characterEncoding=utf-8";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "";
+
+    @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String numEtudiant = request.getParameter("numEt");
 
-        if (numEtudiant == null || numEtudiant.isEmpty()) {
-            // Redirection avec message si le numéro d'étudiant est manquant
-            response.sendRedirect("index.jsp?error=missing");
+        // Vérification des données
+        if (numEtudiant == null || numEtudiant.trim().isEmpty()) {
+            redirectWithMessage(response, "index.jsp", "error=missing");
             return;
         }
 
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-
+        // Chargement du driver JDBC
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            String url = "jdbc:mysql://localhost:3306/projet_jsp?useSSL=false&characterEncoding=utf-8";
-            String username = "root";
-            String password = "";
-            connection = DriverManager.getConnection(url, username, password);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            redirectWithMessage(response, "index.jsp", "error=driver");
+            return;
+        }
 
-            String query = "DELETE FROM etudiant WHERE numEt = ?";
-            preparedStatement = connection.prepareStatement(query);
+        // Suppression de l'étudiant avec try-with-resources
+        String query = "DELETE FROM etudiant WHERE numEt = ?";
+        try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+             PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+
             preparedStatement.setString(1, numEtudiant);
-
             int rowsAffected = preparedStatement.executeUpdate();
 
             if (rowsAffected > 0) {
-                // Redirection avec message en cas de suppression réussie
-                response.sendRedirect("index.jsp?success=true");
+                redirectWithMessage(response, "index.jsp", "success=true");
             } else {
-                // Redirection avec message si aucun étudiant n'a été supprimé
-                response.sendRedirect("index.jsp?error=failed");
+                redirectWithMessage(response, "index.jsp", "error=notfound");
             }
+
         } catch (Exception e) {
             e.printStackTrace();
-            // Redirection avec message en cas d'erreur lors de la suppression
-            response.sendRedirect("index.jsp?error=delete");
-        } finally {
-            try {
-                if (preparedStatement != null) preparedStatement.close();
-                if (connection != null) connection.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-                // Gérer les erreurs de fermeture de la connexion
-            }
+            redirectWithMessage(response, "index.jsp", "error=delete");
         }
+    }
+
+    /**
+     * Méthode utilitaire pour rediriger avec un paramètre de message
+     */
+    private void redirectWithMessage(HttpServletResponse response, String url, String message) throws IOException {
+        response.sendRedirect(url + "?" + message);
     }
 }
